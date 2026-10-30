@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(FoundationModels)
 import FoundationModels
+#endif
 
 /// Multi-provider LLM service supporting on-device Apple Intelligence plus
 /// OpenAI, Anthropic (Claude), and Google Gemini.
@@ -160,6 +162,7 @@ final class LLMService: ObservableObject {
         onToken: @escaping (String) -> Void,
         onComplete: @escaping (String) -> Void
     ) async throws {
+        #if canImport(FoundationModels)
         guard #available(macOS 26, *) else {
             throw LLMError.appleIntelligenceUnavailable
         }
@@ -200,6 +203,9 @@ final class LLMService: ObservableObject {
             self.currentResponse = fullResponse
             onComplete(fullResponse)
         }
+        #else
+        throw LLMError.appleIntelligenceUnavailable
+        #endif
     }
 
     // MARK: - OpenAI Streaming
