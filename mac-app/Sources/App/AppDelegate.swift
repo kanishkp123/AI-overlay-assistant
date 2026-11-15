@@ -17,7 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var audioCaptureManager: AudioCaptureManager!
     private var contextBuilder: ContextBuilder!
     private var llmService: LLMService!
-    private var visionService: VisionService!
+    private var tesseractOCRService: TesseractOCRService!
     private var whisperService: WhisperService!
 
     private var statusItem: NSStatusItem?
@@ -28,7 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Initialize services
         stealthManager = StealthManager()
         llmService = LLMService()
-        visionService = VisionService()
+        tesseractOCRService = TesseractOCRService()
         whisperService = WhisperService()
         audioCaptureManager = AudioCaptureManager()
         screenCaptureManager = ScreenCaptureManager()
@@ -37,7 +37,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Initialize view model with dependencies
         overlayViewModel = OverlayViewModel(
             llmService: llmService,
-            visionService: visionService,
+            tesseractOCRService: tesseractOCRService,
             whisperService: whisperService,
             audioCaptureManager: audioCaptureManager,
             screenCaptureManager: screenCaptureManager,
