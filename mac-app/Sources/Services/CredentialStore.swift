@@ -11,6 +11,7 @@ final class CredentialStore {
     // MARK: - Key identifiers
 
     enum KeyIdentifier: String, CaseIterable {
+        case openRouterKey = "openrouter_api_key"
         case openAIKey = "openai_api_key"
         case anthropicKey = "anthropic_api_key"
         case geminiKey = "gemini_api_key"
