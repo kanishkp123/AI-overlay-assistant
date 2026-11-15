@@ -1,6 +1,9 @@
 # 🧠 AI Overlay Assistant (macOS)
 
-A native macOS AI assistant that captures screen content, transcribes audio, and runs answers through on-device Apple models or the LLM API of your choice — all displayed in a **translucent floating overlay** that is **completely invisible to screen sharing and recording tools**.
+A native macOS AI assistant that captures screen content, transcribes audio, and runs answers through the LLM API of your choice — all displayed in a **translucent floating overlay** that is **completely invisible to screen sharing and recording tools**.
+
+**OCR Engine:** Tesseract CLI (replaces Apple Vision framework)  
+**Default LLM:** NVIDIA Nemotron 3 Ultra via OpenRouter (free tier)
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B%20Ventura-blue)
 ![Swift 5.9](https://img.shields.io/badge/Swift-5.9-orange)
@@ -11,9 +14,9 @@ A native macOS AI assistant that captures screen content, transcribes audio, and
 ## ✨ Features
 
 - **🔒 Screen-Share Invisible** — Overlay is hidden from Zoom, Teams, OBS, QuickTime, and all macOS screenshot tools using `NSWindow.sharingType = .none`
-- **📸 Screen Capture** — Capture any screen region using ScreenCaptureKit with on-device OCR via the Apple Vision framework (no network, no API key)
+- **📸 Screen Capture** — Capture any screen region using ScreenCaptureKit with on-device OCR via **Tesseract** (no network, no API key)
 - **🎤 Audio Transcription** — Real-time speech-to-text via Whisper API with voice activity detection
-- **🤖 Multi-LLM Support** — On-device Apple Intelligence, OpenAI (GPT-4o), Anthropic (Claude), and Google (Gemini) with streaming responses
+- **🤖 Multi-LLM Support** — OpenRouter (Nemotron 3 Ultra free), OpenAI (GPT-4o), Anthropic (Claude), and Google (Gemini) with streaming responses
 - **💎 Glassmorphic UI** — Beautiful, translucent floating overlay with vibrancy effects
 - **🔐 Private Credentials** — API keys stored in a local `0600` file owned by your user; no keychain access, so the app never triggers keychain prompts
 - **⌨️ Global Hotkeys** — Trigger from anywhere with system-wide keyboard shortcuts
@@ -48,7 +51,9 @@ AI Overlay Assistant can be used to make everyday work **faster, clearer, and mo
 - macOS 13.0 (Ventura) or later
 - Xcode 15.0+
 - Swift 5.9+
-- An API key is **optional** — on-device Apple Intelligence and OCR work out of the box. Add an OpenAI, Anthropic, or Google key only if you want a cloud model.
+- **Tesseract OCR** — install via `brew install tesseract`
+- **OpenRouter API key** — get one free at [openrouter.ai](https://openrouter.ai) (Nemotron 3 Ultra is free)
+- Optional: OpenAI, Anthropic, or Google API keys for other models
 
 ### Build & Run
 
@@ -69,7 +74,7 @@ open Package.swift
 
 1. Grant **Accessibility** permission when prompted (required for global hotkeys)
 2. The main dashboard window opens on launch
-3. Optionally add API key(s) in Settings (gear icon) — on-device Apple Intelligence needs none
+3. Add your OpenRouter API key in Settings (gear icon) — Nemotron 3 Ultra is free
 4. Press **⌘⇧Space** to show the overlay
 
 ---
@@ -109,7 +114,7 @@ mac-app/
     │   └── ContextBuilder.swift       # LLM context assembly
     ├── Services/
     │   ├── LLMService.swift           # Multi-provider LLM (streaming)
-    │   ├── VisionService.swift        # On-device OCR (Apple Vision)
+    │   ├── TesseractOCRService.swift  # On-device OCR (Tesseract)
     │   ├── WhisperService.swift       # Whisper transcription
     │   └── CredentialStore.swift      # API key storage
     ├── UI/
@@ -148,7 +153,7 @@ The overlay remains visible only on your physical display.
 ## 🔐 Security & Privacy
 
 - **API keys** are stored in `~/Library/Application Support/AIOverlayAssistant/credentials.json` with `0600` permissions in a `0700` directory — never in `.env` files, and the app never touches the Keychain
-- **OCR** runs on-device via the Apple Vision framework — screenshots are never uploaded for text extraction
+- **OCR** runs on-device via **Tesseract** — screenshots are never uploaded for text extraction
 - **Audio** is streamed in-memory only — never saved to disk
 - **Screenshots** are discarded after processing — never persisted
 - **Conversation history** is stored in memory only (clears on app quit)
@@ -160,7 +165,7 @@ The overlay remains visible only on your physical display.
 
 | Provider | Models | Features |
 |---|---|---|
-| Apple Intelligence | On-device Foundation Models | Streaming, no API key (macOS 26+) |
+| **OpenRouter** | Nemotron 3 Ultra (free), GPT-4o, Claude, Gemini, and 100+ more | Streaming, reasoning, free tier available |
 | OpenAI | GPT-4o, GPT-4 Turbo | Streaming, Vision |
 | Anthropic | Claude Sonnet 4 | Streaming, Long context |
 | Google | Gemini 2.0 Flash | Streaming, Free tier |
