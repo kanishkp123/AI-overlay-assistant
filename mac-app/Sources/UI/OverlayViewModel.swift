@@ -45,7 +45,7 @@ final class OverlayViewModel: ObservableObject {
     // MARK: - Dependencies
 
     private let llmService: LLMService
-    private let visionService: VisionService
+    private let tesseractOCRService: TesseractOCRService
     private let whisperService: WhisperService
     private let audioCaptureManager: AudioCaptureManager
     private let screenCaptureManager: ScreenCaptureManager
@@ -55,14 +55,14 @@ final class OverlayViewModel: ObservableObject {
 
     init(
         llmService: LLMService,
-        visionService: VisionService,
+        tesseractOCRService: TesseractOCRService,
         whisperService: WhisperService,
         audioCaptureManager: AudioCaptureManager,
         screenCaptureManager: ScreenCaptureManager,
         contextBuilder: ContextBuilder
     ) {
         self.llmService = llmService
-        self.visionService = visionService
+        self.tesseractOCRService = tesseractOCRService
         self.whisperService = whisperService
         self.audioCaptureManager = audioCaptureManager
         self.screenCaptureManager = screenCaptureManager
@@ -92,7 +92,7 @@ final class OverlayViewModel: ObservableObject {
 
     // MARK: - Actions
 
-    /// Captures the screen and analyzes it with Vision API.
+    /// Captures the screen and analyzes it with Tesseract OCR.
     func captureAndAnalyze() {
         Task {
             appState = .capturing
@@ -122,13 +122,13 @@ final class OverlayViewModel: ObservableObject {
                 return
             }
 
-            // Perform OCR
+            // Perform OCR using Tesseract
             do {
-                let result = try await visionService.performOCR(imageBase64: base64)
+                let result = try await tesseractOCRService.performOCR(imageBase64: base64)
                 self.screenText = result.fullText
                 print("📝 Screen text extracted: \(result.fullText.prefix(200))...")
             } catch {
-                print("⚠️ OCR failed, will use direct vision: \(error.localizedDescription)")
+                print("⚠️ OCR failed: \(error.localizedDescription)")
                 // Fall through — we can still use vision LLM directly
             }
 
