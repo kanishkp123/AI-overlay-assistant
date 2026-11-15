@@ -5,12 +5,13 @@ import Carbon
 struct SettingsView: View {
     // MARK: - State
 
+    @State private var openRouterKey = ""
     @State private var openAIKey = ""
     @State private var anthropicKey = ""
     @State private var geminiKey = ""
 
-    @State private var selectedProvider: LLMService.Provider = .appleAI
-    @State private var selectedModel = "Apple Intelligence"
+    @State private var selectedProvider: LLMService.Provider = .openRouter
+    @State private var selectedModel = "nvidia/nemotron-3-ultra-550b-a55b:free"
     @State private var overlayOpacity: Double = 0.85
     @State private var showSaveConfirmation = false
 
@@ -75,6 +76,19 @@ struct SettingsView: View {
     private var apiKeysTab: some View {
         Form {
             Section {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Label("OpenRouter API Key", systemImage: "key")
+                        Spacer()
+                        keyStatusBadge(.openRouterKey)
+                    }
+                    SecureField("sk-or-...", text: $openRouterKey)
+                        .textFieldStyle(.roundedBorder)
+                    Text("Used for Nemotron 3 Ultra and other models via OpenRouter")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Label("OpenAI API Key", systemImage: "key")
@@ -263,7 +277,7 @@ struct SettingsView: View {
     private var modelList: some View {
         VStack(alignment: .leading, spacing: 8) {
             Group {
-                modelRow("Apple Intelligence", "On-device, no API key", .appleAI)
+                modelRow("Nemotron 3 Ultra (Free)", "NVIDIA's flagship reasoning model via OpenRouter", .openRouter)
                 modelRow("GPT-4o", "Fast, multimodal, vision-capable", .openai)
                 modelRow("GPT-4 Turbo", "High capability, lower cost", .openai)
                 modelRow("claude-sonnet-4-20250514", "Excellent reasoning, long context", .anthropic)
@@ -355,6 +369,9 @@ struct SettingsView: View {
     }
 
     private func saveKeys() {
+        if !openRouterKey.isEmpty {
+            credentials.save(key: .openRouterKey, value: openRouterKey)
+        }
         if !openAIKey.isEmpty {
             credentials.save(key: .openAIKey, value: openAIKey)
         }
@@ -381,6 +398,7 @@ struct SettingsView: View {
     }
 
     private func clearFields() {
+        openRouterKey = ""
         openAIKey = ""
         anthropicKey = ""
         geminiKey = ""
