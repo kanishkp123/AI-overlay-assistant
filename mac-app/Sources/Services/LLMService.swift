@@ -1,17 +1,14 @@
 import Foundation
-#if canImport(FoundationModels)
-import FoundationModels
-#endif
 
-/// Multi-provider LLM service supporting on-device Apple Intelligence plus
-/// OpenAI, Anthropic (Claude), and Google Gemini.
+/// Multi-provider LLM service supporting OpenRouter (with NVIDIA Nemotron 3 Ultra)
+/// plus OpenAI, Anthropic (Claude), and Google Gemini.
 /// Uses streaming for real-time token delivery to the overlay UI.
 final class LLMService: ObservableObject {
 
     // MARK: - Types
 
     enum Provider: String, CaseIterable, Identifiable {
-        case appleAI = "Apple Intelligence"
+        case openRouter = "OpenRouter (Nemotron 3 Ultra)"
         case openai = "OpenAI"
         case anthropic = "Anthropic"
         case gemini = "Gemini"
@@ -20,7 +17,7 @@ final class LLMService: ObservableObject {
 
         var defaultModel: String {
             switch self {
-            case .appleAI: return "Apple Intelligence"
+            case .openRouter: return "nvidia/nemotron-3-ultra-550b-a55b:free"
             case .openai: return "gpt-4o"
             case .anthropic: return "claude-sonnet-4-20250514"
             case .gemini: return "gemini-2.0-flash"
@@ -28,13 +25,23 @@ final class LLMService: ObservableObject {
         }
 
         /// The credential key required by this provider, or nil for providers
-        /// that need no API key (Apple Intelligence is fully on-device).
+        /// that need no API key.
         var credentialsKey: CredentialStore.KeyIdentifier? {
             switch self {
-            case .appleAI: return nil
+            case .openRouter: return .openRouterKey
             case .openai: return .openAIKey
             case .anthropic: return .anthropicKey
             case .gemini: return .geminiKey
+            }
+        }
+
+        /// Base URL for the API
+        var baseURL: String {
+            switch self {
+            case .openRouter: return "https://openrouter.ai/api/v1"
+            case .openai: return "https://api.openai.com/v1"
+            case .anthropic: return "https://api.anthropic.com/v1"
+            case .gemini: return "https://generativelanguage.googleapis.com/v1beta"
             }
         }
     }
@@ -45,7 +52,6 @@ final class LLMService: ObservableObject {
         case networkError(String)
         case rateLimited
         case tokenBudgetExceeded
-        case appleIntelligenceUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -54,8 +60,6 @@ final class LLMService: ObservableObject {
             case .networkError(let msg): return "Network error: \(msg)"
             case .rateLimited: return "Rate limited — please wait"
             case .tokenBudgetExceeded: return "Token budget exceeded for this session"
-            case .appleIntelligenceUnavailable:
-                return "Apple Intelligence is unavailable on this device. Enable it in System Settings or choose another provider."
             }
         }
     }
@@ -68,8 +72,8 @@ final class LLMService: ObservableObject {
 
     // MARK: - Properties
 
-    var selectedProvider: Provider = .appleAI
-    var selectedModel: String = "Apple Intelligence"
+    var selectedProvider: Provider = .openRouter
+    var selectedModel: String = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
     private let credentials = CredentialStore.shared
     private var lastRequestTime: Date?
@@ -96,28 +100,6 @@ final class LLMService: ObservableObject {
 
         lastRequestTime = Date()
 
-        // Apple Intelligence runs fully on-device and needs no API key.
-        if selectedProvider == .appleAI {
-            Task {
-                await MainActor.run {
-                    self.isStreaming = true
-                    self.currentResponse = ""
-                    self.error = nil
-                }
-
-                do {
-                    try await streamAppleIntelligence(systemPrompt: systemPrompt, messages: messages, onToken: onToken, onComplete: onComplete)
-                } catch {
-                    await MainActor.run {
-                        self.isStreaming = false
-                        self.error = error.localizedDescription
-                    }
-                    onError(error)
-                }
-            }
-            return
-        }
-
         guard let keyIdentifier = selectedProvider.credentialsKey,
               let apiKey = credentials.retrieve(key: keyIdentifier) else {
             onError(LLMError.noAPIKey)
@@ -133,8 +115,8 @@ final class LLMService: ObservableObject {
 
             do {
                 switch selectedProvider {
-                case .appleAI:
-                    break
+                case .openRouter:
+                    try await streamOpenRouter(apiKey: apiKey, systemPrompt: systemPrompt, messages: messages, onToken: onToken, onComplete: onComplete)
                 case .openai:
                     try await streamOpenAI(apiKey: apiKey, systemPrompt: systemPrompt, messages: messages, onToken: onToken, onComplete: onComplete)
                 case .anthropic:
@@ -152,60 +134,41 @@ final class LLMService: ObservableObject {
         }
     }
 
-    // MARK: - Apple Intelligence Streaming
+    // MARK: - OpenRouter Streaming (NVIDIA Nemotron 3 Ultra)
 
-    /// Streams a response from the on-device Apple Intelligence model via the
-    /// Foundation Models framework. Requires no API key.
-    private func streamAppleIntelligence(
+    /// Streams a response from OpenRouter using the NVIDIA Nemotron 3 Ultra model.
+    private func streamOpenRouter(
+        apiKey: String,
         systemPrompt: String,
         messages: [[String: String]],
         onToken: @escaping (String) -> Void,
         onComplete: @escaping (String) -> Void
     ) async throws {
-        #if canImport(FoundationModels)
-        guard #available(macOS 26, *) else {
-            throw LLMError.appleIntelligenceUnavailable
-        }
+        let url = URL(string: "\(selectedProvider.baseURL)/chat/completions")!
 
-        let model = SystemLanguageModel.default
-        guard model.isAvailable else {
-            throw LLMError.appleIntelligenceUnavailable
-        }
+        var allMessages: [[String: String]] = [["role": "system", "content": systemPrompt]]
+        allMessages.append(contentsOf: messages)
 
-        // Flatten system + conversation history into a single prompt.
-        var transcript = ""
-        for msg in messages {
-            let role = msg["role"] == "assistant" ? "Assistant" : "User"
-            transcript += "\(role): \(msg["content"] ?? "")\n"
-        }
-        let prompt = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body: [String: Any] = [
+            "model": selectedModel,
+            "messages": allMessages,
+            "stream": true,
+            "max_tokens": 1024,
+            "temperature": 0.7,
+            "extra_body": [
+                "reasoning": ["enabled": true]
+            ]
+        ]
 
-        let session = LanguageModelSession(model: model, instructions: systemPrompt)
-        let stream = session.streamResponse(to: prompt)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("AI-Overlay-Assistant", forHTTPHeaderField: "HTTP-Referer")
+        request.setValue("AI Overlay Assistant", forHTTPHeaderField: "X-Title")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        var fullResponse = ""
-        var previous = ""
-
-        for try await snapshot in stream {
-            let piece = snapshot.content
-            guard piece.count > previous.count else { continue }
-            let delta = String(piece.dropFirst(previous.count))
-            previous = piece
-            fullResponse = piece
-            await MainActor.run {
-                self.currentResponse = piece
-                onToken(delta)
-            }
-        }
-
-        await MainActor.run {
-            self.isStreaming = false
-            self.currentResponse = fullResponse
-            onComplete(fullResponse)
-        }
-        #else
-        throw LLMError.appleIntelligenceUnavailable
-        #endif
+        try await performSSEStream(request: request, parser: parseOpenAISSE, onToken: onToken, onComplete: onComplete)
     }
 
     // MARK: - OpenAI Streaming
@@ -217,7 +180,7 @@ final class LLMService: ObservableObject {
         onToken: @escaping (String) -> Void,
         onComplete: @escaping (String) -> Void
     ) async throws {
-        let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+        let url = URL(string: "\(selectedProvider.baseURL)/chat/completions")!
 
         var allMessages: [[String: String]] = [["role": "system", "content": systemPrompt]]
         allMessages.append(contentsOf: messages)
@@ -248,7 +211,7 @@ final class LLMService: ObservableObject {
         onToken: @escaping (String) -> Void,
         onComplete: @escaping (String) -> Void
     ) async throws {
-        let url = URL(string: "https://api.anthropic.com/v1/messages")!
+        let url = URL(string: "\(selectedProvider.baseURL)/messages")!
 
         let body: [String: Any] = [
             "model": selectedModel,
@@ -277,7 +240,7 @@ final class LLMService: ObservableObject {
         onToken: @escaping (String) -> Void,
         onComplete: @escaping (String) -> Void
     ) async throws {
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(selectedModel):streamGenerateContent?key=\(apiKey)&alt=sse")!
+        let url = URL(string: "\(selectedProvider.baseURL)/models/\(selectedModel):streamGenerateContent?key=\(apiKey)&alt=sse")!
 
         // Convert chat messages to Gemini format
         var contents: [[String: Any]] = []
@@ -413,10 +376,12 @@ final class LLMService: ObservableObject {
             }
 
             do {
-                let url = URL(string: "https://api.openai.com/v1/chat/completions")!
+                // OpenRouter supports vision models - use a vision-capable model
+                let visionModel = selectedProvider == .openRouter ? "google/gemini-2.0-flash-exp:free" : "gpt-4o"
+                let url = URL(string: "\(selectedProvider.baseURL)/chat/completions")!
 
                 let body: [String: Any] = [
-                    "model": "gpt-4o",
+                    "model": visionModel,
                     "messages": [
                         [
                             "role": "user",
@@ -437,6 +402,8 @@ final class LLMService: ObservableObject {
                 request.httpMethod = "POST"
                 request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("AI-Overlay-Assistant", forHTTPHeaderField: "HTTP-Referer")
+                request.setValue("AI Overlay Assistant", forHTTPHeaderField: "X-Title")
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
                 try await performSSEStream(request: request, parser: parseOpenAISSE, onToken: onToken, onComplete: onComplete)
