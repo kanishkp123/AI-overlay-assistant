@@ -1,31 +1,7 @@
-# Swift / Xcode
-.build/
+# Xcode
 *.xcodeproj/
-xcuserdata/
 *.xcworkspace/
 DerivedData/
-*.swp
-*.swo
-*~
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
-
-# SPM
-.swiftpm/
-Package.resolved
-Packages/
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-.Spotlight-V100
-.Trashes
-
-# IDE
 *.pbxuser
 !default.pbxuser
 *.mode1v3
@@ -34,30 +10,41 @@ Packages/
 !default.mode2v3
 *.perspectivev3
 !default.perspectivev3
-*.xccheckout
+xcuserdata/
 *.moved-aside
-*.xcuserstate
-*.xcscmblueprint
 
-# Environment / Secrets
-.env
-.env.*
-*.key
-*.pem
-
-# Python (optional services)
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-.venv/
-*.egg-info/
-
-# Node (optional services)
-node_modules/
-npm-debug.log*
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+*.xcodeproj
+xcuserdata/
 
 # Build artifacts
-build/
-dist/
-*.app 
+*.app
+*.dSYM
+*.ipa
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Credentials (never commit real keys!)
+/credentials.json
+~/Library/Application Support/AIOverlayAssistant/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
